@@ -32,8 +32,8 @@ impl EventLoop {
                         break;
                     }
                 } else {
-                    // let e: RecvError = task.unwrap_err();
-                    // println!("An error occurred: {}", e)
+                    let e: std::sync::mpsc::RecvError = task.err().unwrap();
+                    println!("An error occurred: {}", e)
                 }
             }
         })
