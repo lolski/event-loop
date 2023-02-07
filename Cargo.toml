@@ -1,0 +1,15 @@
+[package]
+name = "gcp-pubsub"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "server1"
+path = "src/server1/bin/main.rs"
+
+[[bin]]
+name  = "server2"
+path = "src/server2/bin/main.rs"
+
+[dependencies]
