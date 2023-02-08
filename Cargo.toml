@@ -13,3 +13,5 @@ name  = "server2"
 path = "src/server2/bin/main.rs"
 
 [dependencies]
+google-cloud-pubsub = "0.12.1"
+tokio = { version = "=1.24.1", features = ["full"] }
