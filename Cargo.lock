@@ -307,6 +307,7 @@ dependencies = [
 name = "gcp-pubsub"
 version = "0.1.0"
 dependencies = [
+ "google-cloud-googleapis",
  "google-cloud-pubsub",
  "tokio",
 ]

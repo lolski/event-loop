@@ -14,4 +14,5 @@ path = "src/server2/bin/main.rs"
 
 [dependencies]
 google-cloud-pubsub = "0.12.1"
+google-cloud-googleapis = "0.7.0"
 tokio = { version = "=1.24.1", features = ["full"] }
