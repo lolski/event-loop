@@ -6,9 +6,7 @@ use google_cloud_googleapis::pubsub::v1::PubsubMessage;
 #[tokio::main]
 async fn main() {
     let client = Client::default().await.unwrap();
-    // create new topic
     let topic = lib::topic(&client, "topic-test").await;
-
     let publisher = topic.new_publisher(None);
     let mut message = PubsubMessage::default();
     message.data = "message-test".into();
