@@ -1,4 +1,4 @@
-use std::sync::mpsc::{channel, Receiver, Sender, sync_channel, SyncSender};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::thread::JoinHandle;
 
@@ -14,7 +14,7 @@ fn main() {
 }
 
 enum Event {
-    Task(Box<dyn FnOnce() -> i32 + Send>, Option<SyncSender<i32>>),
+    Task(Box<dyn FnOnce() -> i32 + Send>, Option<Sender<i32>>),
     Stop()
 }
 
@@ -39,7 +39,10 @@ impl EventLoop {
                         Event::Task(task, s_opt) => {
                             let result = task();
                             if let Some(s) = s_opt {
-                                s.send(result).unwrap();
+                                let send = s.send(result);
+                                if let Err(e) = send {
+                                    println!("An error occurred when sending the result of a task the caller: {}", e);
+                                }
                             }
                         }
                         Event::Stop() => {
@@ -55,7 +58,7 @@ impl EventLoop {
     }
 
     pub fn submit_task(self: &Self, task: Box<dyn FnOnce() -> i32 + Send>) -> Receiver<i32> {
-        let (send_chan, recv_chan) = sync_channel::<i32>(1);
+        let (send_chan, recv_chan) = channel();
         let _ = self.submit(Event::Task(task, Some(send_chan)));
         recv_chan
     }
