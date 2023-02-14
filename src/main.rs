@@ -1,3 +1,5 @@
+use futures::Future;
+
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::thread::JoinHandle;
@@ -12,7 +14,7 @@ fn main() {
 
 
 enum Event {
-    Task(Box<dyn FnOnce() -> i32 + Send>),
+    Task(Box<dyn FnOnce() -> i32 + Send>, Option<Box<dyn Future<Output=i32>>>),
     Stop()
 }
 
@@ -34,8 +36,11 @@ impl EventLoop {
                 let event = recv_chan.recv();
                 if event.is_ok() {
                     match event.unwrap() {
-                        Event::Task(t) => {
-                            let _ = t();
+                        Event::Task(task, future_opt) => {
+                            let result = task();
+                            if let Some(fut) = future_opt {
+
+                            }
                         }
                         Event::Stop() => {
                             break;
