@@ -1,12 +1,14 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
-use std::thread::JoinHandle;
+use std::thread::{JoinHandle, sleep};
+use std::time::Duration;
 
 fn main() {
     let el = EventLoop::create();
     let res = el.submit_task(Box::new(|| { println!("executing task 1"); 5 }));
     let res2 = el.submit_task(Box::new(|| { println!("executing task 2"); 6 }));
     let res3 = el.submit_task(Box::new(|| { println!("executing task 3"); 7 }));
+    sleep(Duration::from_secs(10));
     println!("result: {}", res.recv().unwrap());
     println!("result: {}", res2.recv().unwrap());
     println!("result: {}", res3.recv().unwrap());
@@ -14,7 +16,7 @@ fn main() {
 }
 
 enum Event {
-    Task(Box<dyn FnOnce() -> i32 + Send>, Option<Sender<i32>>),
+    Task { task: Box<dyn FnOnce() -> i32 + Send>, sender_opt: Option<Sender<i32>> },
     Stop()
 }
 
@@ -33,25 +35,22 @@ impl EventLoop {
     fn spawn_event_loop_thread(recv_chan: Receiver<Event>) -> JoinHandle<()> {
         thread::spawn(move || {
             loop {
-                let event = recv_chan.recv();
-                if event.is_ok() {
-                    match event.unwrap() {
-                        Event::Task(task, s_opt) => {
-                            let result = task();
-                            if let Some(s) = s_opt {
-                                let send = s.send(result);
-                                if let Err(e) = send {
-                                    println!("An error occurred when sending the result of a task the caller: {}", e);
-                                }
+                match recv_chan.recv() {
+                    Ok(Event::Task { task, sender_opt }) => {
+                        let result = task();
+                        if let Some(sender) = sender_opt {
+                            let send = sender.send(result);
+                            if let Err(e) = send {
+                                println!("An error occurred when sending the result of a task the caller: {}", e);
                             }
                         }
-                        Event::Stop() => {
-                            break;
-                        }
-                    };
-                } else {
-                    let e: std::sync::mpsc::RecvError = event.err().unwrap();
-                    println!("An error occurred: {}", e)
+                    },
+                    Ok(Event::Stop()) => {
+                        break;
+                    },
+                    Err(e) => {
+                        println!("An error occurred: {}", e)
+                    }
                 }
             }
         })
@@ -59,7 +58,7 @@ impl EventLoop {
 
     pub fn submit_task(self: &Self, task: Box<dyn FnOnce() -> i32 + Send>) -> Receiver<i32> {
         let (send_chan, recv_chan) = channel();
-        let _ = self.submit(Event::Task(task, Some(send_chan)));
+        let _ = self.submit(Event::Task { task, sender_opt: Some(send_chan) });
         recv_chan
     }
 
