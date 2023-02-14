@@ -14,7 +14,10 @@ fn main() {
 
 
 enum Event {
-    Task(Box<dyn FnOnce() -> i32 + Send>, Option<Box<dyn Future<Output=i32>>>),
+    Task(
+        Box<dyn FnOnce() -> i32 + Send>,
+        Option<Box<dyn Future<Output=i32> + Send>>
+    ),
     Stop()
 }
 
@@ -54,8 +57,11 @@ impl EventLoop {
         })
     }
 
-    pub fn submit_task(self: &Self, task: Box<dyn FnOnce() -> i32 + Send>) -> () {
-        let _ = self.submit(Event::Task(task));
+    pub fn submit_task(self: &Self, task: Box<dyn FnOnce() -> i32 + Send>) -> Box<dyn Future<Output=i32> + Send> {
+        let future: Box<dyn Future<Output=i32> + Send> = Box::new(async { 5 } );
+        let _ = self.submit(Event::Task(task, Some(future)));
+        let future: Box<dyn Future<Output=i32> + Send> = Box::new(async { 5 } );
+        future
     }
 
     fn submit(self: &Self, event: Event) -> () {
