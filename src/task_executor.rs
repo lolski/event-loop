@@ -16,20 +16,25 @@ impl TaskFuture {
     }
 }
 
-enum TaskExecutorMessage {
-    TaskSubmission { task: Task, sender_opt: Option<Sender<i32>> },
-    Stop { sender: Sender<()> }
+enum TaskExecutorSubmission {
+    Task { task: Task, sender_opt: Option<Sender<i32>> },
+    StopSignal { sender: Sender<()> }
 }
 
-impl TaskExecutorMessage {
-    fn new_task_submission(task: Task) -> (Self, TaskFuture) {
+impl TaskExecutorSubmission {
+    fn new_task(task: Task) -> (Self, TaskFuture) {
         let (sender, receiver) = channel();
-        (TaskExecutorMessage::TaskSubmission { task, sender_opt: Some(sender) }, TaskFuture { future: receiver })
+        (TaskExecutorSubmission::Task { task, sender_opt: Some(sender) }, TaskFuture { future: receiver })
+    }
+
+    fn new_stop_signal() -> (Self, Receiver<()>) {
+        let (sender, receiver) = channel();
+        (TaskExecutorSubmission::StopSignal { sender }, receiver )
     }
 }
 
 pub(crate) struct TaskExecutor {
-    sender: Sender<TaskExecutorMessage>,
+    sender: Sender<TaskExecutorSubmission>,
     thread: JoinHandle<()>
 }
 
@@ -40,11 +45,11 @@ impl TaskExecutor {
         TaskExecutor { sender, thread }
     }
 
-    fn spawn_thread(recv_chan: Receiver<TaskExecutorMessage>) -> JoinHandle<()> {
+    fn spawn_thread(recv_chan: Receiver<TaskExecutorSubmission>) -> JoinHandle<()> {
         thread::spawn(move || {
             loop {
                 match recv_chan.recv() {
-                    Ok(TaskExecutorMessage::TaskSubmission { task, sender_opt: send_chan_opt }) => {
+                    Ok(TaskExecutorSubmission::Task { task, sender_opt: send_chan_opt }) => {
                         let result = (task.task)();
                         if let Some(send_chan) = send_chan_opt {
                             let send = send_chan.send(result);
@@ -56,7 +61,7 @@ impl TaskExecutor {
                     Err(e) => {
                         println!("An error occurred while receiving a task: {}", e)
                     },
-                    Ok(TaskExecutorMessage::Stop { sender }) => {
+                    Ok(TaskExecutorSubmission::StopSignal { sender }) => {
                         let send = sender.send(());
                         if let Err(e) = send {
                             println!("An error occurred when stopping the task executor: {}", e);
@@ -69,19 +74,19 @@ impl TaskExecutor {
     }
 
     pub fn submit_task(self: &Self, task: Box<dyn FnOnce() -> i32 + Send>) -> TaskFuture {
-        let (task_submission, future) = TaskExecutorMessage::new_task_submission(Task { task });
+        let (task_submission, future) = TaskExecutorSubmission::new_task(Task { task });
         let _ = self.submit(task_submission);
         future
     }
 
     pub fn stop(self: Self) -> () {
-        let (send_chan, recv_chan) = channel();
-        self.submit(TaskExecutorMessage::Stop { sender: send_chan } );
-        recv_chan.recv().unwrap();
+        let (stop, recv) = TaskExecutorSubmission::new_stop_signal();
+        self.submit(stop);
+        recv.recv().unwrap();
         let _ = self.thread.join();
     }
 
-    fn submit(self: &Self, message: TaskExecutorMessage) -> () {
+    fn submit(self: &Self, message: TaskExecutorSubmission) -> () {
         let _ = self.sender.send(message);
     }
 }
